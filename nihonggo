@@ -1,0 +1,2081 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>高考日语听力训练器</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  :root{
+    --bg:#0f172a; --panel:#1b2537; --panel2:#243149; --line:#334155;
+    --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8;
+  }
+  html,body{height:100%;margin:0}
+  body{
+    background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;
+    font-family:"PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;font-size:14px;
+  }
+  header{
+    display:flex;align-items:center;gap:8px;padding:10px 14px;flex-wrap:wrap;
+    background:var(--panel);border-bottom:1px solid var(--line);
+  }
+  header h1{font-size:15px;margin:0 10px 0 0;white-space:nowrap}
+  .btn{
+    background:var(--panel2);color:var(--text);border:1px solid var(--line);
+    padding:6px 12px;border-radius:6px;cursor:pointer;font-size:13px;
+    transition:.15s;user-select:none;white-space:nowrap;
+  }
+  .btn:hover{background:#334155}
+  .btn.active{background:var(--accent);color:#0b1220;border-color:var(--accent);font-weight:600}
+  .btn.primary{background:#0ea5e9;border-color:#0ea5e9;color:#0b1220;font-weight:600}
+  .btn.primary:hover{background:#38bdf8}
+  .btn.danger{background:#dc2626;border-color:#dc2626;color:#fff}
+  .btn.danger:hover{background:#ef4444}
+  .btn.tiny{padding:3px 8px;font-size:12px}
+  .btn.speed{padding:5px 12px;font-size:12.5px}
+  .btn.jump{padding:5px 10px;font-size:12.5px}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn:disabled:hover{background:var(--panel2)}
+  .muted{color:var(--muted);font-size:12px}
+  .hw-select{
+    background:var(--panel2);border:1px solid var(--line);color:var(--text);
+    padding:6px 10px;border-radius:6px;font-size:13px;outline:none;
+    min-width:150px;max-width:240px;
+  }
+  .hw-select:focus{border-color:var(--accent)}
+
+  #readonlyBanner{
+    display:none;
+    background:linear-gradient(90deg,#0ea5e9,#38bdf8);
+    color:#0b1220;
+    padding:8px 16px;
+    font-size:13px;
+    font-weight:600;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  #readonlyBanner.show{display:flex}
+  #readonlyBanner .btn{
+    background:rgba(0,0,0,.2);color:#fff;border-color:transparent;
+    padding:4px 10px;font-size:12px;
+  }
+  #readonlyBanner .btn:hover{background:rgba(0,0,0,.35)}
+
+  main{flex:1;display:flex;overflow:hidden}
+
+  #inputView{
+    flex:1;display:flex;flex-direction:column;padding:16px;gap:12px;overflow:hidden;
+  }
+  #inputView .hint{
+    background:rgba(56,189,248,.08);
+    border:1px dashed rgba(56,189,248,.35);
+    border-radius:8px;padding:10px 14px;font-size:12.5px;color:#bae6fd;line-height:1.8;
+  }
+  #inputView .hint b{color:#7dd3fc}
+  #sourceInput{
+    flex:1;min-height:200px;resize:none;background:var(--panel2);
+    border:1px solid var(--line);color:var(--text);padding:14px 16px;
+    border-radius:8px;font-size:14.5px;line-height:1.9;font-family:inherit;
+    outline:none;transition:border-color .15s;
+  }
+  #sourceInput:focus{border-color:var(--accent)}
+  #sourceInput.dragover{border-color:var(--accent);background:rgba(56,189,248,.06)}
+
+  #questionView{flex:1;display:none;overflow:hidden}
+  #questionView.active{display:flex}
+
+  .sidebar{
+    width:240px;flex-shrink:0;background:var(--panel);
+    border-right:1px solid var(--line);
+    display:flex;flex-direction:column;overflow:hidden;
+  }
+  .sidebar-head{
+    padding:10px 14px;border-bottom:1px solid var(--line);
+    font-size:12px;color:var(--muted);
+    display:flex;justify-content:space-between;align-items:center;
+    cursor:pointer;transition:background .15s;user-select:none;
+  }
+  .sidebar-head:hover{background:var(--panel2);color:var(--text)}
+  .sidebar-head.no-back{cursor:default}
+  .sidebar-head.no-back:hover{background:transparent;color:var(--muted)}
+  .sidebar-head .sb-title{display:flex;align-items:center;gap:6px}
+  .sidebar-head .sb-back{opacity:.7;font-size:14px}
+  .sidebar-head:hover .sb-back{opacity:1}
+  #questionList{list-style:none;margin:0;padding:6px;overflow-y:auto;flex:1}
+  #questionList .q-item{
+    padding:10px 12px;border-radius:6px;cursor:pointer;margin-bottom:3px;
+    font-size:13.5px;transition:.12s;user-select:none;line-height:1.4;
+  }
+  #questionList .q-item:hover{background:var(--panel2)}
+  #questionList .q-item.active{background:var(--accent);color:#0b1220;font-weight:600}
+  #questionList .q-item .q-line{display:flex;align-items:center;gap:8px}
+  #questionList .q-item .qnum{
+    font-size:11px;opacity:.65;min-width:22px;text-align:center;
+    background:rgba(255,255,255,.1);border-radius:3px;padding:1px 4px;flex-shrink:0;
+  }
+  #questionList .q-item.active .qnum{opacity:.9;background:rgba(0,0,0,.18)}
+  #questionList .q-item .qlabel{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #questionList .q-item .qsub{
+    font-size:11px;opacity:.55;margin-top:3px;padding-left:30px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  #questionList .q-item.active .qsub{opacity:.75}
+
+  .content{
+    flex:1;display:flex;flex-direction:column;overflow:hidden;
+    padding:12px 18px;gap:10px;
+  }
+  .qhead{display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap}
+  .qhead .qtitle{font-size:16px;font-weight:600}
+  .qhead .qsubtitle{
+    font-size:12px;background:rgba(56,189,248,.18);color:#7dd3fc;
+    padding:2px 8px;border-radius:4px;
+  }
+
+  .player{
+    display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+    padding:10px 14px;background:var(--panel);
+    border:1px solid var(--line);border-radius:8px;flex-shrink:0;
+  }
+  .player .divider{width:1px;height:22px;background:var(--line);margin:0 4px}
+
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);flex-shrink:0}
+  .tab-btn{
+    background:transparent;border:none;color:var(--muted);
+    padding:8px 16px;cursor:pointer;font-size:13px;
+    border-bottom:2px solid transparent;margin-bottom:-1px;
+    transition:.15s;font-family:inherit;
+  }
+  .tab-btn:hover{color:var(--text)}
+  .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+
+  .tab-pane{display:none;flex:1;flex-direction:column;overflow:hidden;gap:10px;min-height:0}
+  .tab-pane.active{display:flex}
+
+  #textDisplay{
+    flex:1;min-height:120px;resize:none;background:var(--panel2);
+    border:1px solid var(--line);color:var(--text);padding:14px 16px;
+    border-radius:8px;font-size:15px;line-height:2;font-family:inherit;outline:none;
+  }
+  #textDisplay:focus{border-color:var(--accent)}
+
+  .voice-card{
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+    padding:8px 12px;flex-shrink:0;
+  }
+  .voice-card .vc-label{color:var(--muted);font-size:12px;min-width:44px}
+  .voice-card input[type=range]{width:100px}
+
+  select{background:var(--panel2);border:1px solid var(--line);color:var(--text);
+         padding:5px 8px;border-radius:6px;font-size:12px;outline:none;max-width:200px}
+  input[type=range]{vertical-align:middle;accent-color:var(--accent)}
+
+  .mask-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0}
+  .mask-toolbar .spacer{flex:1}
+  #maskStatus{
+    display:inline-block;padding:3px 10px;border-radius:5px;font-size:12px;
+    transition:.2s;color:var(--muted);min-width:80px;text-align:right;
+  }
+  #maskStatus.ok{color:#4ade80}
+  #maskStatus.warn{color:#fbbf24}
+
+  .mask-edit-wrap{
+    flex:1;min-height:0;background:#ffffff;
+    border:1px solid #cbd5e1;border-radius:10px;overflow:hidden;
+    display:flex;flex-direction:column;
+  }
+  .mask-edit-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:6px 12px;background:#f1f5f9;color:#475569;font-size:12px;
+    border-bottom:1px solid #e2e8f0;flex-shrink:0;
+  }
+  #maskTextArea{
+    flex:1;width:100%;min-height:0;resize:none;background:#ffffff;
+    color:#1e293b;border:none;padding:14px 18px;
+    font-size:16px;line-height:2.1;font-family:inherit;outline:none;display:block;
+  }
+  #maskTextArea::placeholder{color:#94a3b8}
+
+  #toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+    background:#0ea5e9;color:#0b1220;padding:10px 22px;border-radius:8px;
+    font-weight:600;font-size:13px;display:none;z-index:9999;
+    box-shadow:0 6px 24px rgba(0,0,0,.45);max-width:80vw;text-align:center;line-height:1.6;
+  }
+  #toast.warn{background:#fbbf24}
+  #toast.err{background:#f87171;color:#fff}
+
+  .tip-ok{color:#4ade80}
+  .tip-warn{color:#fbbf24}
+  .tip-bad{color:#f87171}
+
+  .modal-bg{
+    position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);
+    display:none;z-index:100;align-items:center;justify-content:center;
+  }
+  .modal-bg.show{display:flex}
+  .modal{
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:20px;min-width:340px;max-width:560px;width:90%;
+    box-shadow:0 12px 48px rgba(0,0,0,.6);
+  }
+  .modal h3{margin:0 0 12px;font-size:15px}
+  .modal p{margin:0 0 16px;color:var(--muted);font-size:13px;line-height:1.7}
+  .modal input, .modal textarea{
+    width:100%;background:var(--panel2);border:1px solid var(--line);
+    color:var(--text);padding:8px 12px;border-radius:6px;font-size:13px;
+    outline:none;font-family:inherit;
+  }
+  .modal textarea{resize:none;height:100px;line-height:1.5;word-break:break-all}
+  .modal input:focus, .modal textarea:focus{border-color:var(--accent)}
+  .modal .modal-actions{
+    display:flex;justify-content:flex-end;gap:8px;
+  }
+
+  @media (max-width:760px){
+    .sidebar{width:150px}
+    .content{padding:10px 12px}
+    #maskTextArea,#textDisplay{font-size:14px;padding:10px 12px}
+    .hw-select{min-width:100px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎧 高考日语听力训练器</h1>
+  <span class="muted" id="hwLabel">作业</span>
+  <select id="hwSelect" class="hw-select"></select>
+  <button class="btn tiny" id="newHwBtn" title="新建作业">＋ 新建</button>
+  <button class="btn tiny" id="renameHwBtn" title="重命名">✏️ 重命名</button>
+  <button class="btn tiny" id="deleteHwBtn" title="删除当前作业">🗑 删除</button>
+  <button class="btn tiny" id="shareHwBtn" title="生成分享链接">🔗 分享</button>
+  <button class="btn tiny" id="exportHwBtn" title="导出为文件">📤 导出</button>
+  <label class="btn tiny" title="从文件导入">📥 导入<input type="file" id="importHwFile" accept=".json,application/json" hidden></label>
+  <span class="muted" id="statusText" style="margin-left:auto"></span>
+</header>
+
+<div id="readonlyBanner">
+  <span id="readonlyMsg">📖 你正在浏览分享的作业，仅可查看和播放</span>
+  <button class="btn" id="exitReadonlyBtn">退出浏览</button>
+</div>
+
+<main>
+  <div id="inputView">
+    <div class="hint">
+      <b>粘贴听力原文：</b>整段高考日语听力原文粘贴到下方，点「⚡ 分析并切题」。
+      <br>· 自动删除中文旁白（开头说明、中间提示等）
+      <br>· 按 <b>「听下面的录音，回答第 X 至 Y 题」</b> 识别每组录音
+      <br>· 每组内再按 <b>1. 2. 3.</b> 题号切分，每道题都带上提示语和对应对话
+    </div>
+    <textarea id="sourceInput" placeholder="把整段高考日语听力原文粘贴到这里…"></textarea>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn primary" id="analyzeBtn">⚡ 分析并切题</button>
+      <label class="btn">📄 从文件加载<input type="file" id="sourceFile" accept=".txt,.md,.lrc,.srt,.vtt,.ass,.ssa,.html,.htm,.rtf,.docx,.pdf,.json,.csv,text/*,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden></label>
+      <button class="btn" id="clearSourceBtn">🗑 清空</button>
+    </div>
+  </div>
+
+  <div id="questionView">
+    <aside class="sidebar">
+      <div class="sidebar-head" id="backToInput" title="点击返回编辑原文">
+        <span class="sb-title"><span class="sb-back">←</span><span id="sbTitle">题目列表</span></span>
+        <span id="qCount" class="muted"></span>
+      </div>
+      <ul id="questionList"></ul>
+    </aside>
+
+    <section class="content">
+      <div class="qhead">
+        <span class="qtitle" id="qTitle">—</span>
+        <span class="qsubtitle" id="qSubtitle" style="display:none"></span>
+      </div>
+
+      <div class="player">
+        <button class="btn primary" id="playBtn">▶ 播放</button>
+        <button class="btn" id="stopBtn">⏹ 停止</button>
+
+        <span class="divider"></span>
+        <span class="muted">倍速</span>
+        <span id="speedBtns" style="display:inline-flex;gap:4px"></span>
+
+        <span class="divider"></span>
+        <span class="muted">跳转</span>
+        <button class="btn jump" data-jump="-10">« 10s</button>
+        <button class="btn jump" data-jump="-5">« 5s</button>
+        <button class="btn jump" data-jump="5">5s »</button>
+        <button class="btn jump" data-jump="10">10s »</button>
+
+        <span class="divider"></span>
+        <span class="muted" id="ttsTip"></span>
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="text">📝 听力原文</button>
+        <button class="tab-btn" data-tab="mask">✏️ 挖空练习</button>
+      </div>
+
+      <div class="tab-pane active" data-pane="text">
+        <textarea id="textDisplay" placeholder="（本题原文）"></textarea>
+
+        <div class="voice-card">
+          <span class="vc-label">女声</span>
+          <select id="femaleSel" style="flex:1"><option>（加载中…）</option></select>
+          <span class="muted">音高</span>
+          <input type="range" id="femalePitch" min="0.7" max="1.3" step="0.05" value="1">
+          <span class="muted" id="femalePitchVal">1.00</span>
+          <button class="btn tiny" id="testFemale">试听</button>
+        </div>
+
+        <div class="voice-card">
+          <span class="vc-label">男声</span>
+          <select id="maleSel" style="flex:1"><option>（加载中…）</option></select>
+          <span class="muted">音高</span>
+          <input type="range" id="malePitch" min="0.6" max="1.1" step="0.05" value="1">
+          <span class="muted" id="malePitchVal">1.00</span>
+          <button class="btn tiny" id="testMale">试听</button>
+        </div>
+      </div>
+
+      <div class="tab-pane" data-pane="mask">
+        <div class="mask-toolbar">
+          <button class="btn" id="maskCopyBtn">📋 从原文复制</button>
+          <button class="btn" id="maskClearBtn">🗑 清空</button>
+          <button class="btn" id="maskUnderlineBtn">➖ 选中变填空</button>
+          <span class="spacer"></span>
+          <span id="maskStatus">就绪</span>
+        </div>
+
+        <div class="mask-edit-wrap">
+          <div class="mask-edit-head">
+            <span>✏️ 挖空文本（可直接编辑）</span>
+            <span class="muted">自动保存</span>
+          </div>
+          <textarea id="maskTextArea" placeholder="点「从原文复制」把本题原文复制过来，再选中要挖空的文字，点「选中变填空」。"></textarea>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<div class="modal-bg" id="renameModal">
+  <div class="modal">
+    <h3>重命名作业</h3>
+    <input type="text" id="renameInput" placeholder="输入作业名称">
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn" id="renameCancel">取消</button>
+      <button class="btn primary" id="renameConfirm">确定</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="deleteModal">
+  <div class="modal">
+    <h3>删除作业</h3>
+    <p id="deleteMsg">确定要删除这个作业吗？此操作不可恢复。</p>
+    <div class="modal-actions">
+      <button class="btn" id="deleteCancel">取消</button>
+      <button class="btn danger" id="deleteConfirm">确定删除</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="shareModal">
+  <div class="modal">
+    <h3>分享作业链接</h3>
+    <p id="shareTip">把下面的链接发给别人，别人打开就能看到这份作业（只读，不能编辑）。<br>
+    如果链接过长，某些聊天工具可能截断，建议用邮件或复制粘贴到记事本发送。</p>
+    <textarea id="shareUrl" readonly></textarea>
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn" id="shareClose">关闭</button>
+      <button class="btn primary" id="shareCopy">复制链接</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ==================== 基础工具 ==================== */
+var $ = function (s) { return document.querySelector(s); };
+var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
+
+var STORAGE_KEY = 'jp-listening-trainer-v25';
+
+var SPEED_OPTIONS = [
+  { label: '原速', value: 1.0 },
+  { label: '1.2×', value: 1.2 },
+  { label: '1.5×', value: 1.5 }
+];
+
+var state = {
+  view: 'input',
+  currentHwId: '',
+  homeworks: [],
+  ttsRate: 1,
+  femaleVoice: '',
+  maleVoice: '',
+  femalePitch: 1,
+  malePitch: 1,
+  readonly: false,
+  sharedHw: null
+};
+
+function currentHw() {
+  if (state.readonly && state.sharedHw) return state.sharedHw;
+  for (var i = 0; i < state.homeworks.length; i++) {
+    if (state.homeworks[i].id === state.currentHwId) return state.homeworks[i];
+  }
+  return null;
+}
+
+function createHomework(name, sourceText) {
+  return {
+    id: 'hw_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    name: name || ('作业 ' + (state.homeworks.length + 1)),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    sourceText: sourceText || '',
+    questions: [],
+    currentIndex: 0
+  };
+}
+
+/* ==================== 提示 ==================== */
+var toastTimer = null;
+function showToast(msg, type, persistent) {
+  var el = $('#toast');
+  el.innerHTML = msg;
+  el.className = type === 'warn' ? 'warn' : (type === 'err' ? 'err' : '');
+  el.style.display = 'block';
+  clearTimeout(toastTimer);
+  if (!persistent) toastTimer = setTimeout(function () { el.style.display = 'none'; }, 2400);
+}
+function hideToast() { clearTimeout(toastTimer); $('#toast').style.display = 'none'; }
+
+/* ==================== 存储 ==================== */
+function save() {
+  if (state.readonly) return;
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+}
+var saveTimer = null;
+function saveSoon() { clearTimeout(saveTimer); saveTimer = setTimeout(save, 400); }
+
+function loadState() {
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    var d = JSON.parse(raw);
+    if (d && typeof d === 'object') {
+      Object.keys(state).forEach(function (k) {
+        if (k in d && k !== 'readonly' && k !== 'sharedHw') state[k] = d[k];
+      });
+    }
+  } catch (e) {}
+  if (!Array.isArray(state.homeworks)) state.homeworks = [];
+}
+
+/* ==================== 工具 ==================== */
+function normalizeNum(s) {
+  if (!s) return s;
+  var result = '';
+  for (var i = 0; i < s.length; i++) {
+    var c = s.charCodeAt(i);
+    if (c >= 0xFF10 && c <= 0xFF19) result += String.fromCharCode(c - 0xFF10 + 48);
+    else result += s[i];
+  }
+  return result;
+}
+
+function isJapaneseLine(line) {
+  return /[\u3040-\u309f\u30a0-\u30ff\u30fc]/.test(line);
+}
+
+function isPromptLine(line) {
+  return /听下[面边][\s\S]{0,50}?(?:录音|对话|短文|会话|材料|内容)[\s\S]{0,40}?回答第\s*[0-9０-９]+/i.test(line);
+}
+
+var SPEAKER_LINE_RE = /^(?:女の人|男の人|女性|男性|女の子|男の子|女|男|[FMfm]\d?)\s*[:：]/;
+
+function cleanSourceText(text) {
+  var lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  var out = [];
+  var removed = 0;
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+    var trimmed = line.trim();
+    if (!trimmed) { out.push(line); continue; }
+    if (isPromptLine(trimmed)) { out.push(line); continue; }
+    if (isJapaneseLine(trimmed)) { out.push(line); continue; }
+    if (SPEAKER_LINE_RE.test(trimmed)) { out.push(line); continue; }
+    removed++;
+  }
+  return { text: out.join('\n'), removed: removed };
+}
+
+/* ==================== 切题 ==================== */
+function buildPromptRegex() {
+  return /听下[面边][\s\S]{0,50}?(?:录音|对话|短文|会话|材料|内容)[\s\S]{0,40}?回答第\s*([0-9０-９]+)\s*(?:[至到\-—~～]\s*([0-9０-９]+))?\s*[小题]*题/g;
+}
+
+function splitQuestions(text) {
+  var normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  var re = buildPromptRegex();
+  var promptMatches = [];
+  var m;
+  while ((m = re.exec(normalized)) !== null) {
+    if (m.index === re.lastIndex) re.lastIndex++;
+    promptMatches.push({
+      index: m.index,
+      length: m[0].length,
+      full: m[0],
+      from: normalizeNum(m[1]),
+      to: normalizeNum(m[2] || m[1])
+    });
+  }
+  if (!promptMatches.length) return fallbackSplit(normalized);
+
+  var result = [];
+  for (var i = 0; i < promptMatches.length; i++) {
+    var pm = promptMatches[i];
+    var from = pm.from;
+    var to = pm.to;
+    var rangeLabel = (from === to) ? ('第 ' + from + ' 题') : ('第 ' + from + '–' + to + ' 题');
+    var promptText = pm.full.replace(/[ \t]+/g, ' ').replace(/\n+/g, ' ').trim();
+
+    var afterStart = pm.index + pm.length;
+    var afterEnd = (i + 1 < promptMatches.length) ? promptMatches[i + 1].index : normalized.length;
+    var afterText = normalized.slice(afterStart, afterEnd).trim();
+
+    var numbered = afterText ? splitByNumber(afterText, from, to) : [];
+
+    if (numbered.length > 0) {
+      numbered.forEach(function (q) {
+        q.text = promptText + '\n\n' + q.text;
+        q.subtitle = rangeLabel;
+        result.push(q);
+      });
+    } else {
+      result.push({
+        type: 'prompt',
+        title: rangeLabel,
+        subtitle: '听力录音',
+        text: promptText + (afterText ? '\n\n' + afterText : ''),
+        maskText: '',
+        from: from,
+        to: to
+      });
+    }
+  }
+  return result;
+}
+
+function splitByNumber(text, startNum, endNum) {
+  var startInt = parseInt(startNum, 10);
+  var endInt = parseInt(endNum, 10);
+  if (isNaN(startInt) || isNaN(endInt)) return [];
+
+  var lines = text.split('\n');
+  var result = [];
+  var currentNum = null;
+  var currentText = '';
+  var numRe = /^\s*([0-9０-９]{1,2})\s*[.、．)）:：]\s*(.*)$/;
+
+  function pushCurrent() {
+    if (currentNum !== null && currentText.trim()) {
+      result.push({
+        type: 'prompt',
+        title: '第 ' + currentNum + ' 题',
+        subtitle: '题号 ' + currentNum,
+        text: currentText.trim(),
+        maskText: '',
+        from: currentNum,
+        to: currentNum
+      });
+    }
+  }
+
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+    var trimmed = line.trim();
+    if (!trimmed) { if (currentText) currentText += '\n'; continue; }
+    var m = trimmed.match(numRe);
+    if (m) {
+      var nStr = normalizeNum(m[1]);
+      var n = parseInt(nStr, 10);
+      var expected = (currentNum === null) ? startInt : (currentNum + 1);
+      if (!isNaN(n) && n >= startInt && n <= endInt && n === expected) {
+        pushCurrent();
+        currentNum = n;
+        currentText = m[2] ? m[2] + '\n' : '';
+        continue;
+      }
+    }
+    currentText += line + '\n';
+  }
+  pushCurrent();
+  return result;
+}
+
+function fallbackSplit(text) {
+  var blocks = text.split(/\n\s*\n/).filter(function (b) { return b.trim(); });
+  if (blocks.length <= 1) {
+    return [{ type: 'prompt', title: '全文', subtitle: '', text: text.trim(), maskText: '' }];
+  }
+  var result = [];
+  for (var i = 0; i < blocks.length; i++) {
+    result.push({ type: 'prompt', title: '第 ' + (i + 1) + ' 段', subtitle: '', text: blocks[i].trim(), maskText: '' });
+  }
+  return result;
+}
+
+/* ==================== 分享编码 ==================== */
+function encodeShareData(obj) {
+  try {
+    var json = JSON.stringify(obj);
+    var bytes;
+    if (typeof TextEncoder !== 'undefined') {
+      bytes = new TextEncoder().encode(json);
+    } else {
+      var arr = [];
+      for (var i = 0; i < json.length; i++) {
+        var c = json.charCodeAt(i);
+        if (c < 128) arr.push(c);
+        else if (c < 2048) arr.push(192 | (c >> 6), 128 | (c & 63));
+        else arr.push(224 | (c >> 12), 128 | ((c >> 6) & 63), 128 | (c & 63));
+      }
+      bytes = new Uint8Array(arr);
+    }
+    var compressed;
+    if (window.pako) {
+      compressed = pako.deflate(bytes);
+    } else {
+      compressed = bytes;
+    }
+    var binary = '';
+    var chunkSize = 0x8000;
+    for (var j = 0; j < compressed.length; j += chunkSize) {
+      binary += String.fromCharCode.apply(null, compressed.subarray(j, j + chunkSize));
+    }
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  } catch (e) {
+    console.error('encode fail', e);
+    return '';
+  }
+}
+
+function decodeShareData(str) {
+  try {
+    var b64 = str.replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    var binary = atob(b64);
+    var bytes = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    var decompressed;
+    if (window.pako) {
+      decompressed = pako.inflate(bytes);
+    } else {
+      decompressed = bytes;
+    }
+    var json;
+    if (typeof TextDecoder !== 'undefined') {
+      json = new TextDecoder().decode(decompressed);
+    } else {
+      var s = '';
+      for (var j = 0; j < decompressed.length; j++) s += String.fromCharCode(decompressed[j]);
+      json = decodeURIComponent(escape(s));
+    }
+    return JSON.parse(json);
+  } catch (e) {
+    console.error('decode fail', e);
+    return null;
+  }
+}
+
+/* ==================== 分享 ==================== */
+function shareCurrentHw() {
+  var hw = currentHw();
+  if (!hw) { showToast('还没有作业', 'warn'); return; }
+  if (!hw.questions || !hw.questions.length) { showToast('作业还没有内容', 'warn'); return; }
+
+  var payload = {
+    v: 1,
+    name: hw.name || '未命名作业',
+    sourceText: hw.sourceText || '',
+    questions: hw.questions,
+    currentIndex: hw.currentIndex || 0,
+    ttsRate: state.ttsRate,
+    femalePitch: state.femalePitch,
+    malePitch: state.malePitch
+  };
+  var encoded = encodeShareData(payload);
+  if (!encoded) { showToast('生成分享链接失败', 'err'); return; }
+
+  var base = location.href.split('#')[0];
+  var url = base + '#s=' + encoded;
+  $('#shareUrl').value = url;
+
+  /* 粗略估计长度 */
+  var len = url.length;
+  var tip = $('#shareTip');
+  if (len > 6000) {
+    tip.innerHTML = '⚠ 链接较长（' + len + ' 字符），部分聊天工具可能截断。<br>建议复制后粘贴到邮件、记事本或文档里发送。';
+    tip.style.color = '#fbbf24';
+  } else {
+    tip.innerHTML = '把下面的链接发给别人，别人打开就能看到这份作业（只读，不能编辑）。<br>链接长度：' + len + ' 字符。';
+    tip.style.color = '';
+  }
+
+  $('#shareModal').classList.add('show');
+}
+
+function loadSharedHomeworkFromHash() {
+  var hash = location.hash || '';
+  if (hash.indexOf('#s=') !== 0) return false;
+  var encoded = hash.slice(3);
+  if (!encoded) return false;
+
+  var data = decodeShareData(encoded);
+  if (!data) { showToast('分享链接已损坏', 'err'); return false; }
+
+  var hw = createHomework(data.name || '分享作业', data.sourceText || '');
+  hw.questions = Array.isArray(data.questions) ? data.questions.map(function (q, i) {
+    return {
+      type: q.type || 'prompt',
+      title: q.title || ('第 ' + (i + 1) + ' 题'),
+      subtitle: q.subtitle || '',
+      text: q.text || '',
+      maskText: q.maskText || '',
+      from: q.from,
+      to: q.to
+    };
+  }) : [];
+  hw.currentIndex = data.currentIndex || 0;
+
+  state.sharedHw = hw;
+  state.readonly = true;
+  state.view = hw.questions.length ? 'questions' : 'input';
+  if (data.ttsRate) state.ttsRate = data.ttsRate;
+  if (data.femalePitch) state.femalePitch = data.femalePitch;
+  if (data.malePitch) state.malePitch = data.malePitch;
+
+  /* 显示只读横幅 */
+  $('#readonlyBanner').classList.add('show');
+  $('#readonlyMsg').textContent = '📖 你正在浏览分享的作业「' + (hw.name || '未命名') + '」（只读）';
+
+  /* 隐藏编辑相关按钮 */
+  ['#hwSelect', '#hwLabel', '#newHwBtn', '#renameHwBtn', '#deleteHwBtn', '#importHwFile'].forEach(function (sel) {
+    var el = $(sel);
+    if (el) el.style.display = 'none';
+  });
+  var importLabel = document.querySelector('label[for=""]');
+  $$('label.btn').forEach(function (l) {
+    if (l.querySelector('#importHwFile')) l.style.display = 'none';
+  });
+
+  /* 禁用输入 */
+  $('#sourceInput').setAttribute('readonly', 'true');
+  $('#analyzeBtn').disabled = true;
+  $('#clearSourceBtn').disabled = true;
+  var sourceFileLabel = $('#sourceFile').parentNode;
+  if (sourceFileLabel) sourceFileLabel.style.display = 'none';
+
+  return true;
+}
+
+function exitReadonly() {
+  state.readonly = false;
+  state.sharedHw = null;
+  location.hash = '';
+  /* 刷新页面以确保干净状态 */
+  location.reload();
+}
+
+/* ==================== 作业渲染 ==================== */
+function renderHwSelect() {
+  var sel = $('#hwSelect');
+  sel.innerHTML = '';
+  state.homeworks.forEach(function (hw) {
+    var o = document.createElement('option');
+    o.value = hw.id;
+    var label = hw.name || '(未命名)';
+    if (hw.questions && hw.questions.length) label += ' · ' + hw.questions.length + '题';
+    o.textContent = label;
+    if (hw.id === state.currentHwId) o.selected = true;
+    sel.appendChild(o);
+  });
+  if (!state.homeworks.length) {
+    var o0 = document.createElement('option');
+    o0.textContent = '（暂无作业）';
+    o0.disabled = true;
+    sel.appendChild(o0);
+  }
+}
+
+function switchHomework(id) {
+  if (state.readonly) return;
+  stopTTS();
+  state.currentHwId = id;
+  var hw = currentHw();
+  if (hw) {
+    state.view = (hw.questions && hw.questions.length) ? 'questions' : 'input';
+  }
+  renderHwSelect();
+  renderAll();
+  save();
+}
+
+function newHomework() {
+  if (state.readonly) return;
+  var hw = createHomework('作业 ' + (state.homeworks.length + 1), '');
+  state.homeworks.unshift(hw);
+  state.currentHwId = hw.id;
+  state.view = 'input';
+  stopTTS();
+  renderHwSelect();
+  renderAll();
+  save();
+  showToast('已新建作业');
+}
+
+function renameCurrentHw() {
+  if (state.readonly) return;
+  var hw = currentHw();
+  if (!hw) { showToast('还没有作业', 'warn'); return; }
+  $('#renameInput').value = hw.name || '';
+  $('#renameModal').classList.add('show');
+  setTimeout(function () { $('#renameInput').focus(); $('#renameInput').select(); }, 50);
+}
+
+function deleteCurrentHw() {
+  if (state.readonly) return;
+  var hw = currentHw();
+  if (!hw) { showToast('还没有作业', 'warn'); return; }
+  $('#deleteMsg').textContent = '确定要删除作业「' + (hw.name || '未命名') + '」吗？此操作不可恢复。';
+  $('#deleteModal').classList.add('show');
+}
+
+function reallyDeleteHw() {
+  var hw = currentHw();
+  if (!hw) { $('#deleteModal').classList.remove('show'); return; }
+
+  var name = hw.name || '未命名';
+  var idx = state.homeworks.indexOf(hw);
+  if (idx >= 0) state.homeworks.splice(idx, 1);
+
+  if (!state.homeworks.length) {
+    var nw = createHomework('作业 1', '');
+    state.homeworks.push(nw);
+    state.currentHwId = nw.id;
+  } else {
+    state.currentHwId = state.homeworks[0].id;
+  }
+
+  stopTTS();
+  renderHwSelect();
+  state.view = 'input';
+  renderAll();
+  save();
+  $('#deleteModal').classList.remove('show');
+  showToast('已删除「' + name + '」');
+}
+
+function exportCurrentHw() {
+  var hw = currentHw();
+  if (!hw) { showToast('还没有作业', 'warn'); return; }
+  var dump = {
+    type: 'jp-listening-homework',
+    version: 1,
+    name: hw.name,
+    createdAt: hw.createdAt,
+    updatedAt: Date.now(),
+    sourceText: hw.sourceText,
+    questions: hw.questions,
+    currentIndex: hw.currentIndex || 0,
+    ttsRate: state.ttsRate,
+    femaleVoice: state.femaleVoice,
+    maleVoice: state.maleVoice,
+    femalePitch: state.femalePitch,
+    malePitch: state.malePitch
+  };
+  var blob = new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  var safeName = (hw.name || '作业').replace(/[\\\/:*?"<>|]/g, '_');
+  a.download = safeName + '.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  showToast('已导出：' + a.download);
+}
+
+function importHomeworkFile(file) {
+  if (!file) return;
+  if (state.readonly) return;
+  var reader = new FileReader();
+  reader.onload = function () {
+    try {
+      var d = JSON.parse(reader.result);
+      if (!d || typeof d !== 'object') throw new Error('文件格式不对');
+      var hw = createHomework(d.name || ('导入作业 ' + (state.homeworks.length + 1)), d.sourceText || '');
+      hw.questions = Array.isArray(d.questions) ? d.questions.map(function (q, i) {
+        return {
+          type: q.type || 'prompt',
+          title: q.title || ('第 ' + (i + 1) + ' 题'),
+          subtitle: q.subtitle || '',
+          text: q.text || '',
+          maskText: q.maskText || '',
+          from: q.from,
+          to: q.to
+        };
+      }) : [];
+      hw.currentIndex = d.currentIndex || 0;
+      state.homeworks.unshift(hw);
+      state.currentHwId = hw.id;
+      state.view = hw.questions.length ? 'questions' : 'input';
+      if (d.ttsRate) state.ttsRate = d.ttsRate;
+      if (d.femaleVoice) state.femaleVoice = d.femaleVoice;
+      if (d.maleVoice) state.maleVoice = d.maleVoice;
+      if (d.femalePitch) state.femalePitch = d.femalePitch;
+      if (d.malePitch) state.malePitch = d.malePitch;
+      stopTTS();
+      fillVoiceSelects();
+      renderHwSelect();
+      renderAll();
+      save();
+      showToast('已导入：' + hw.name);
+    } catch (err) {
+      showToast('导入失败：' + err.message, 'err');
+    }
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+/* ==================== 渲染主区 ==================== */
+function renderAll() {
+  var hw = currentHw();
+
+  if (!hw) {
+    $('#inputView').style.display = 'flex';
+    $('#questionView').classList.remove('active');
+    $('#sourceInput').value = '';
+    $('#statusText').textContent = '';
+    return;
+  }
+
+  if (state.view === 'input') {
+    $('#inputView').style.display = 'flex';
+    $('#questionView').classList.remove('active');
+    $('#sourceInput').value = hw.sourceText || '';
+    $('#statusText').textContent = hw.questions && hw.questions.length
+      ? (hw.name || '未命名') + ' · ' + hw.questions.length + ' 题'
+      : (hw.name || '未命名');
+  } else {
+    $('#inputView').style.display = 'none';
+    $('#questionView').classList.add('active');
+    renderList();
+    renderQuestion();
+    renderSpeedBtns();
+    $('#statusText').textContent = (hw.name || '未命名') + ' · ' + hw.questions.length + ' 题';
+  }
+}
+
+function renderList() {
+  var hw = currentHw();
+  if (!hw) return;
+  $('#sbTitle').textContent = hw.name || '题目列表';
+  var ul = $('#questionList');
+  ul.innerHTML = '';
+  hw.questions.forEach(function (q, i) {
+    var li = document.createElement('li');
+    li.className = 'q-item' + (i === hw.currentIndex ? ' active' : '');
+
+    var line = document.createElement('div');
+    line.className = 'q-line';
+
+    var num = document.createElement('span');
+    num.className = 'qnum';
+    num.textContent = (i + 1);
+    line.appendChild(num);
+
+    var label = document.createElement('span');
+    label.className = 'qlabel';
+    label.textContent = q.title || ('第 ' + (i + 1) + ' 题');
+    line.appendChild(label);
+
+    li.appendChild(line);
+
+    if (q.subtitle) {
+      var sub = document.createElement('div');
+      sub.className = 'qsub';
+      sub.textContent = q.subtitle;
+      li.appendChild(sub);
+    }
+
+    li.addEventListener('click', function () { selectQuestion(i); });
+    ul.appendChild(li);
+  });
+  $('#qCount').textContent = hw.questions.length + ' 题';
+}
+
+function selectQuestion(i) {
+  var hw = currentHw();
+  if (!hw) return;
+  if (i < 0 || i >= hw.questions.length) return;
+  stopTTS();
+  hw.currentIndex = i;
+  renderList();
+  renderQuestion();
+  save();
+}
+
+function renderQuestion() {
+  var hw = currentHw();
+  if (!hw) return;
+  var q = hw.questions[hw.currentIndex];
+  if (!q) {
+    $('#qTitle').textContent = '—';
+    $('#qSubtitle').style.display = 'none';
+    $('#textDisplay').value = '';
+    $('#maskTextArea').value = '';
+    return;
+  }
+  $('#qTitle').textContent = q.title;
+  if (q.subtitle) {
+    $('#qSubtitle').textContent = q.subtitle;
+    $('#qSubtitle').style.display = 'inline-block';
+  } else {
+    $('#qSubtitle').style.display = 'none';
+  }
+  $('#textDisplay').value = q.text || '';
+  $('#maskTextArea').value = q.maskText || '';
+}
+
+/* ==================== 倍速按钮 ==================== */
+function renderSpeedBtns() {
+  var box = $('#speedBtns');
+  box.innerHTML = '';
+  SPEED_OPTIONS.forEach(function (opt) {
+    var b = document.createElement('button');
+    var active = Math.abs((state.ttsRate || 1) - opt.value) < 0.001;
+    b.className = 'btn speed' + (active ? ' active' : '');
+    b.textContent = opt.label;
+    b.addEventListener('click', function () {
+      state.ttsRate = opt.value;
+      renderSpeedBtns();
+      save();
+      if (ttsState === 'playing') {
+        var my = ++ttsToken;
+        window.speechSynthesis.cancel();
+        setTimeout(function () { nextChunk(my); }, 50);
+      } else if (ttsState === 'paused') {
+        ttsPausedChunk = ttsIndex;
+      }
+      showToast('倍速：' + opt.label);
+    });
+    box.appendChild(b);
+  });
+}
+
+/* ==================== 语音合成（只使用真人级语音） ==================== */
+var ttsToken = 0;
+var ttsQueue = [];
+var ttsIndex = 0;
+var ttsPausedChunk = 0;
+var ttsState = 'idle';
+
+function ttsSupported() {
+  return typeof window.speechSynthesis !== 'undefined' &&
+         typeof window.SpeechSynthesisUtterance !== 'undefined';
+}
+
+/* ★ 真人级语音的判定：名字里带 online / neural */
+function isRealHumanVoice(name) {
+  return /online|neural/i.test(name || '');
+}
+
+function isRealMaleVoice(name) {
+  if (!name) return false;
+  if (!isRealHumanVoice(name)) return false;
+  return /keita|daichi|naoki|ichiro|yunxi|yunjian/i.test(name);
+}
+
+var FEMALE_PREFER = [
+  'Microsoft Nanami Online',
+  'Microsoft Aoi Online',
+  'Microsoft Mayu Online',
+  'Microsoft Shiori Online',
+  'Microsoft Xiaoxiao Online',
+  'Microsoft Xiaoyi Online'
+];
+var MALE_PREFER = [
+  'Microsoft Keita Online',
+  'Microsoft Daichi Online',
+  'Microsoft Naoki Online',
+  'Microsoft Yunxi Online',
+  'Microsoft Yunjian Online'
+];
+var CN_PREFER = [
+  'Microsoft Xiaoxiao Online',
+  'Microsoft Xiaoyi Online',
+  'Microsoft Yunxi Online',
+  'Microsoft Yunjian Online'
+];
+
+function pickVoiceByName(list, prefers) {
+  for (var i = 0; i < prefers.length; i++) {
+    for (var j = 0; j < list.length; j++) {
+      if (list[j].name.toLowerCase().indexOf(prefers[i].toLowerCase()) >= 0) return list[j];
+    }
+  }
+  return null;
+}
+
+function fillVoiceSelects() {
+  var all = window.speechSynthesis.getVoices();
+  var ja = all.filter(function (v) { return /^ja/i.test(v.lang); });
+  /* ★ 只保留真人级语音 */
+  var realJa = ja.filter(function (v) { return isRealHumanVoice(v.name); });
+  var list = realJa.length ? realJa : [];
+
+  var selF = $('#femaleSel'), selM = $('#maleSel');
+  var prevF = selF.value, prevM = selM.value;
+
+  function rebuild(sel, isFemale) {
+    sel.innerHTML = '';
+    if (!list.length) {
+      var o0 = document.createElement('option');
+      o0.textContent = '（需使用 Edge 浏览器）';
+      sel.appendChild(o0);
+      return false;
+    }
+    list.forEach(function (v) {
+      var o = document.createElement('option');
+      o.value = v.name;
+      o.textContent = v.name + '（' + v.lang + '）';
+      sel.appendChild(o);
+    });
+    return true;
+  }
+  if (!rebuild(selF, true) || !rebuild(selM, false)) return;
+
+  function exists(name) {
+    if (!name) return false;
+    for (var i = 0; i < list.length; i++) if (list[i].name === name) return true;
+    return false;
+  }
+  var prefF = state.femaleVoice || prevF;
+  if (exists(prefF) && isFemaleVoiceName(prefF)) selF.value = prefF;
+  else {
+    var vF = pickVoiceByName(list, FEMALE_PREFER);
+    if (!vF) {
+      /* 找第一个非男性 */
+      for (var j = 0; j < list.length; j++) {
+        if (!isMaleVoiceName(list[j].name)) { vF = list[j]; break; }
+      }
+    }
+    if (!vF) vF = list[0];
+    selF.value = vF.name;
+  }
+  var prefM = state.maleVoice || prevM;
+  if (exists(prefM) && isMaleVoiceName(prefM) && prefM !== selF.value) selM.value = prefM;
+  else {
+    var vM = null;
+    for (var k = 0; k < list.length; k++) {
+      if (list[k].name === selF.value) continue;
+      if (isMaleVoiceName(list[k].name)) { vM = list[k]; break; }
+    }
+    if (!vM) {
+      for (var m = 0; m < list.length; m++) {
+        if (list[m].name !== selF.value) { vM = list[m]; break; }
+      }
+    }
+    if (!vM) vM = list[0];
+    selM.value = vM.name;
+  }
+  if (!state.malePitch) {
+    $('#malePitch').value = 1.0;
+    $('#malePitchVal').textContent = '1.00';
+  }
+}
+
+function isMaleVoiceName(name) {
+  return /keita|daichi|naoki|ichiro|yunxi|yunjian|male/i.test(name || '');
+}
+function isFemaleVoiceName(name) {
+  return /nanami|aoi|mayu|shiori|xiaoxiao|xiaoyi|female/i.test(name || '');
+}
+
+function initVoices() {
+  if (!ttsSupported()) {
+    $('#ttsTip').innerHTML = '<span class="tip-bad">⚠ 浏览器不支持语音合成</span>';
+    return;
+  }
+  var load = function () {
+    fillVoiceSelects();
+    var all = window.speechSynthesis.getVoices();
+    var ja = all.filter(function (v) { return /^ja/i.test(v.lang); });
+    var realJa = ja.filter(function (v) { return isRealHumanVoice(v.name); });
+
+    if (realJa.length === 0) {
+      $('#ttsTip').innerHTML = '<span class="tip-bad">⚠ 需使用 Microsoft Edge 浏览器才能使用真人语音</span>';
+    } else {
+      $('#ttsTip').innerHTML = '<span class="tip-ok">✔ 真人级语音（' + realJa.length + ' 个）</span>';
+    }
+  };
+  load();
+  window.speechSynthesis.onvoiceschanged = load;
+  setTimeout(load, 300);
+  setTimeout(load, 1000);
+}
+
+function findVoiceByName(name) {
+  var vs = window.speechSynthesis.getVoices();
+  for (var i = 0; i < vs.length; i++) if (vs[i].name === name) return vs[i];
+  return null;
+}
+
+function findChineseVoice() {
+  var vs = window.speechSynthesis.getVoices();
+  if (!vs.length) return null;
+  var zh = vs.filter(function (v) { return /^zh/i.test(v.lang) && isRealHumanVoice(v.name); });
+  if (!zh.length) return null;
+  return pickVoiceByName(zh, CN_PREFER) || zh[0];
+}
+
+function resolveJapaneseVoice(gender) {
+  var name = (gender === 'male') ? $('#maleSel').value : $('#femaleSel').value;
+  var v = findVoiceByName(name);
+  if (v) return v;
+  var vs = window.speechSynthesis.getVoices();
+  for (var i = 0; i < vs.length; i++) {
+    if (/^ja/i.test(vs[i].lang) && isRealHumanVoice(vs[i].name)) return vs[i];
+  }
+  return null;
+}
+
+function chunkText(text, max) {
+  max = max || 70;
+  var out = [];
+  var cur = '';
+  var strongEnd = '。！？!?；;\n';
+  var softEnd = '、，,';
+  for (var i = 0; i < text.length; i++) {
+    var c = text.charAt(i);
+    cur += c;
+    if (strongEnd.indexOf(c) >= 0) {
+      if (cur.trim()) out.push({ text: cur, pause: 100 });
+      cur = '';
+    } else if (softEnd.indexOf(c) >= 0 && cur.length >= 8) {
+      if (cur.trim()) out.push({ text: cur, pause: 50 });
+      cur = '';
+    } else if (cur.length >= max) {
+      if (cur.trim()) out.push({ text: cur, pause: 80 });
+      cur = '';
+    }
+  }
+  if (cur.trim()) out.push({ text: cur, pause: 100 });
+  return out.length ? out : [{ text: text, pause: 100 }];
+}
+
+function buildQueue(text) {
+  var rawLines = text.split('\n');
+  var spkRe = /^(女の人|男の人|女性|男性|女の子|男の子|女|男|[FMfm]\d?)\s*[:：]\s*/;
+
+  var parsed = [];
+  rawLines.forEach(function (line) {
+    var trimmed = line.trim();
+    if (!trimmed) return;
+
+    var gender = null;
+    var m = trimmed.match(spkRe);
+    var hasSpeaker = false;
+    var content = trimmed;
+
+    if (m) {
+      hasSpeaker = true;
+      var tag = m[1];
+      if (/女/.test(tag) || /^[Ff]/.test(tag)) gender = 'female';
+      else if (/男/.test(tag) || /^[Mm]/.test(tag)) gender = 'male';
+      content = trimmed.replace(spkRe, '');
+    }
+
+    content = content.replace(/^\s*[0-9０-９]{1,2}\s*[.、．)）:：]\s*/, '');
+    if (!content) return;
+
+    parsed.push({ hasSpeaker: hasSpeaker, gender: gender, text: content });
+  });
+
+  var merged = [];
+  var lastGender = null;
+  var sentenceEndRe = /[。！？!?]$/;
+
+  parsed.forEach(function (p) {
+    var gender;
+    if (p.hasSpeaker) { gender = p.gender; lastGender = p.gender; }
+    else { gender = lastGender; }
+
+    if (merged.length === 0) {
+      merged.push({ gender: gender, text: p.text });
+      return;
+    }
+    var prev = merged[merged.length - 1];
+    var prevTrimmed = prev.text.replace(/[ \t]+$/g, '');
+    var prevEndsSentence = sentenceEndRe.test(prevTrimmed);
+
+    if (prev.gender === gender && !prevEndsSentence) {
+      prev.text = prevTrimmed + p.text;
+    } else {
+      merged.push({ gender: gender, text: p.text });
+    }
+  });
+
+  var queue = [];
+  merged.forEach(function (block, blockIdx) {
+    var lang = isJapaneseLine(block.text) ? 'ja' : 'zh';
+    var chunks = chunkText(block.text, 70);
+    var isLastBlock = (blockIdx === merged.length - 1);
+    chunks.forEach(function (c, chunkIdx) {
+      var pause = c.pause || 100;
+      if (chunkIdx === chunks.length - 1 && !isLastBlock) pause += 130;
+      queue.push({ text: c.text, pause: pause, gender: block.gender, lang: lang });
+    });
+  });
+
+  return queue;
+}
+
+function ttsStart(queue) {
+  if (!ttsSupported()) { showToast('当前浏览器不支持语音合成', 'err'); return; }
+  if (!queue || !queue.length) { showToast('没有可朗读的内容', 'warn'); return; }
+  ttsToken++;
+  window.speechSynthesis.cancel();
+  ttsQueue = queue;
+  ttsIndex = 0;
+  ttsPausedChunk = 0;
+  ttsState = 'playing';
+  updatePlayBtn();
+  var my = ttsToken;
+  setTimeout(function () { nextChunk(my); }, 60);
+}
+function nextChunk(my) {
+  if (my !== ttsToken || ttsState !== 'playing') return;
+  if (ttsIndex >= ttsQueue.length) { ttsState = 'idle'; updatePlayBtn(); return; }
+  var item = ttsQueue[ttsIndex];
+  var u = new SpeechSynthesisUtterance(item.text);
+
+  if (item.lang === 'zh') {
+    var vzh = findChineseVoice();
+    if (vzh) { u.voice = vzh; u.lang = vzh.lang; }
+    else { u.lang = 'zh-CN'; }
+    u.pitch = 1;
+  } else {
+    var vja = resolveJapaneseVoice(item.gender);
+    if (vja) { u.voice = vja; u.lang = vja.lang; }
+    else { u.lang = 'ja-JP'; }
+    u.pitch = (item.gender === 'male')
+      ? (parseFloat($('#malePitch').value) || 1)
+      : (parseFloat($('#femalePitch').value) || 1);
+  }
+  u.rate = parseFloat(state.ttsRate) || 1;
+  u.volume = 1;
+
+  u.onend = function () {
+    if (my !== ttsToken) return;
+    ttsIndex++;
+    if (ttsState !== 'playing') return;
+    setTimeout(function () { nextChunk(my); }, item.pause || 100);
+  };
+  u.onerror = function (e) {
+    if (my !== ttsToken) return;
+    console.warn('TTS error:', e && e.error, item.text);
+    if (ttsIndex === 0) {
+      showToast('语音合成失败：请使用 Edge 浏览器', 'err');
+      ttsState = 'idle';
+      updatePlayBtn();
+    } else {
+      ttsIndex++;
+      setTimeout(function () { nextChunk(my); }, 100);
+    }
+  };
+  ttsPausedChunk = ttsIndex;
+  window.speechSynthesis.speak(u);
+}
+function ttsPause() {
+  if (ttsState !== 'playing') return;
+  ttsState = 'paused'; ttsToken++;
+  window.speechSynthesis.cancel();
+  updatePlayBtn();
+}
+function ttsResume() {
+  if (ttsState !== 'paused') return;
+  ttsState = 'playing';
+  ttsIndex = ttsPausedChunk;
+  ttsToken++;
+  updatePlayBtn();
+  var my = ttsToken;
+  setTimeout(function () { nextChunk(my); }, 60);
+}
+function stopTTS() {
+  ttsToken++;
+  ttsState = 'idle';
+  ttsQueue = []; ttsIndex = 0;
+  if (ttsSupported()) window.speechSynthesis.cancel();
+  updatePlayBtn();
+}
+function updatePlayBtn() {
+  var btn = $('#playBtn');
+  if (!btn) return;
+  if (ttsState === 'playing') btn.textContent = '⏸ 暂停';
+  else if (ttsState === 'paused') btn.textContent = '▶ 继续';
+  else btn.textContent = '▶ 播放';
+}
+function playCurrent() {
+  var hw = currentHw();
+  if (!hw) return;
+  var q = hw.questions[hw.currentIndex];
+  if (!q) return;
+  if (ttsState === 'playing') { ttsPause(); return; }
+  if (ttsState === 'paused') { ttsResume(); return; }
+  var queue = buildQueue(q.text || '');
+  if (!queue.length) { showToast('本题没有可朗读的内容', 'warn'); return; }
+  ttsStart(queue);
+}
+
+function estimateChunkMs(item) {
+  if (!item) return 0;
+  var rate = parseFloat(state.ttsRate) || 1;
+  var charCount = (item.text || '').length;
+  var perCharSec = (item.lang === 'ja') ? 0.15 : 0.20;
+  var speechSec = charCount * perCharSec / rate;
+  var pauseSec = (item.pause || 100) / 1000;
+  return (speechSec + pauseSec) * 1000;
+}
+
+function jumpBySeconds(seconds) {
+  var hw = currentHw();
+  if (!hw) return;
+
+  if (!ttsQueue.length) {
+    var q = hw.questions[hw.currentIndex];
+    if (!q) return;
+    ttsQueue = buildQueue(q.text || '');
+    ttsIndex = 0;
+    ttsPausedChunk = 0;
+    ttsState = 'paused';
+  }
+
+  var targetMs = Math.abs(seconds) * 1000;
+  var acc = 0;
+  var newIndex = ttsIndex;
+
+  if (seconds > 0) {
+    while (newIndex < ttsQueue.length && acc < targetMs) {
+      acc += estimateChunkMs(ttsQueue[newIndex]);
+      newIndex++;
+    }
+    if (newIndex >= ttsQueue.length) newIndex = ttsQueue.length - 1;
+  } else {
+    while (newIndex > 0 && acc < targetMs) {
+      newIndex--;
+      acc += estimateChunkMs(ttsQueue[newIndex]);
+    }
+  }
+
+  var wasPlaying = (ttsState === 'playing');
+  ttsToken++;
+  window.speechSynthesis.cancel();
+
+  ttsIndex = newIndex;
+  ttsPausedChunk = newIndex;
+
+  if (wasPlaying) {
+    ttsState = 'playing';
+    var my = ttsToken;
+    setTimeout(function () { nextChunk(my); }, 50);
+  } else {
+    ttsState = 'paused';
+  }
+  updatePlayBtn();
+
+  var direction = seconds > 0 ? '快进' : '回退';
+  showToast(direction + ' ' + Math.abs(seconds) + 's → 第 ' + (newIndex + 1) + '/' + ttsQueue.length + ' 句');
+}
+
+function ttsPreview(gender) {
+  if (!ttsSupported()) { showToast('当前浏览器不支持语音合成', 'err'); return; }
+  stopTTS();
+  var text = (gender === 'male')
+    ? 'はい、田中です。明日の会議は、午後二時からですよ。'
+    : 'もしもし、田中さんですか。明日の会議は、何時からですか。';
+  var u = new SpeechSynthesisUtterance(text);
+  var v = resolveJapaneseVoice(gender);
+  if (v) { u.voice = v; u.lang = v.lang; }
+  else u.lang = 'ja-JP';
+  u.pitch = (gender === 'male')
+    ? (parseFloat($('#malePitch').value) || 1)
+    : (parseFloat($('#femalePitch').value) || 1);
+  u.rate = parseFloat(state.ttsRate) || 1;
+  u.volume = 1;
+  window.speechSynthesis.speak(u);
+}
+
+/* ==================== 多格式文件读取 ==================== */
+var mammothPromise = null;
+var pdfPromise = null;
+
+function ensureMammoth() {
+  if (window.mammoth) return Promise.resolve(window.mammoth);
+  if (mammothPromise) return mammothPromise;
+  mammothPromise = new Promise(function (resolve, reject) {
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
+    s.onload = function () { resolve(window.mammoth); };
+    s.onerror = function () { mammothPromise = null; reject(new Error('mammoth 库加载失败，请检查网络')); };
+    document.head.appendChild(s);
+  });
+  return mammothPromise;
+}
+function ensurePdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (pdfPromise) return pdfPromise;
+  pdfPromise = new Promise(function (resolve, reject) {
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = function () { resolve(window.pdfjsLib); };
+    s.onerror = function () { pdfPromise = null; reject(new Error('pdf.js 库加载失败，请检查网络')); };
+    document.head.appendChild(s);
+  });
+  return pdfPromise;
+}
+function stripLrc(text) {
+  return text.replace(/\[\d{1,2}:\d{2}(\.\d{1,3})?\]/g, '')
+             .replace(/^\[[a-zA-Z]+:.+\]$/gm, '')
+             .replace(/\n{3,}/g, '\n\n').trim();
+}
+function stripSubtitle(text) {
+  return text.split('\n').map(function (line) {
+    if (/^\s*WEBVTT/i.test(line)) return '';
+    if (/^\s*NOTE\b/i.test(line)) return '';
+    if (/\d{1,2}:\d{2}:\d{2}[,.]\d{1,3}\s*-->/.test(line)) return '';
+    if (/^\s*\d+\s*$/.test(line)) return '';
+    return line;
+  }).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+function stripAss(text) {
+  return text.split('\n').map(function (line) {
+    if (/^\s*\[/.test(line)) return '';
+    if (/^\s*(Format|Style|Comment|Title|ScriptType|PlayResX|PlayResY|WrapStyle|ScaledBorderAndShadow|Collisions|Timer|YCbCr Matrix|Audio File|Video File)\s*:/.test(line)) return '';
+    if (/^Dialogue\s*:/i.test(line)) {
+      var parts = line.split(',');
+      return parts.slice(9).join(',').replace(/\{[^}]*\}/g, '').replace(/\\N/gi, '\n').trim();
+    }
+    return '';
+  }).filter(function (l) { return l.trim(); }).join('\n').trim();
+}
+function extractHtmlText(html) {
+  var doc = new DOMParser().parseFromString(html, 'text/html');
+  doc.querySelectorAll('script,style,noscript,head').forEach(function (n) { n.remove(); });
+  var body = doc.body;
+  if (!body) return '';
+  var txt = body.innerText || body.textContent || '';
+  return txt.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+            .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+function extractPdfText(arrayBuffer) {
+  return ensurePdfJs().then(function (pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    return pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+  }).then(function (pdf) {
+    var allPages = [];
+    var chain = Promise.resolve();
+    for (var i = 1; i <= pdf.numPages; i++) {
+      (function (pageNum) {
+        chain = chain.then(function () {
+          return pdf.getPage(pageNum).then(function (page) {
+            return page.getTextContent().then(function (tc) {
+              var lines = [], cur = '';
+              tc.items.forEach(function (it) {
+                cur += it.str || '';
+                if (it.hasEOL) { if (cur.trim()) lines.push(cur); cur = ''; }
+              });
+              if (cur.trim()) lines.push(cur);
+              allPages.push(lines.join('\n'));
+            });
+          });
+        });
+      })(i);
+    }
+    return chain.then(function () {
+      return allPages.join('\n\n')
+        .replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+        .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    });
+  });
+}
+function extractDocxText(arrayBuffer) {
+  return ensureMammoth().then(function (mammoth) {
+    return mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+  }).then(function (result) {
+    return String(result.value || '')
+      .replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+      .replace(/\n{3,}/g, '\n\n').trim();
+  });
+}
+function readSourceFile(file) {
+  return new Promise(function (resolve, reject) {
+    var ext = ((file.name || '').split('.').pop() || '').toLowerCase();
+    if (['txt','md','markdown','lrc','srt','vtt','ass','ssa','json','csv','rtf'].indexOf(ext) >= 0) {
+      var r = new FileReader();
+      r.onload = function () {
+        var txt = String(r.result || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        if (ext === 'lrc') txt = stripLrc(txt);
+        else if (ext === 'srt' || ext === 'vtt') txt = stripSubtitle(txt);
+        else if (ext === 'ass' || ext === 'ssa') txt = stripAss(txt);
+        resolve(txt.trim());
+      };
+      r.onerror = function () { reject(new Error('文件读取失败')); };
+      r.readAsText(file, 'utf-8');
+      return;
+    }
+    if (ext === 'html' || ext === 'htm') {
+      var rh = new FileReader();
+      rh.onload = function () {
+        try { resolve(extractHtmlText(String(rh.result || ''))); }
+        catch (e) { reject(new Error('HTML 解析失败：' + e.message)); }
+      };
+      rh.onerror = function () { reject(new Error('文件读取失败')); };
+      rh.readAsText(file, 'utf-8');
+      return;
+    }
+    if (ext === 'docx') {
+      var rd = new FileReader();
+      rd.onload = function () {
+        extractDocxText(rd.result).then(resolve).catch(function (err) { reject(new Error('docx 解析失败：' + err.message)); });
+      };
+      rd.onerror = function () { reject(new Error('文件读取失败')); };
+      rd.readAsArrayBuffer(file);
+      return;
+    }
+    if (ext === 'doc') { reject(new Error('不支持旧版 .doc。请用 Word 另存为 .docx 或 .txt')); return; }
+    if (ext === 'pdf') {
+      var rp = new FileReader();
+      rp.onload = function () {
+        extractPdfText(rp.result).then(resolve).catch(function (err) { reject(new Error('pdf 解析失败：' + err.message)); });
+      };
+      rp.onerror = function () { reject(new Error('文件读取失败')); };
+      rp.readAsArrayBuffer(file);
+      return;
+    }
+    reject(new Error('不支持的格式：.' + ext));
+  });
+}
+function loadSourceFromFile(file) {
+  if (!file) return;
+  if (state.readonly) return;
+  var hw = currentHw();
+  if (!hw) { showToast('请先新建作业', 'warn'); return; }
+  showToast('⏳ 正在解析「' + file.name + '」…', null, true);
+  readSourceFile(file).then(function (text) {
+    text = (text || '').trim();
+    if (!text) throw new Error('文件内容为空');
+    $('#sourceInput').value = text;
+    hw.sourceText = text;
+    hw.updatedAt = Date.now();
+    save();
+    hideToast();
+    showToast('✔ 已加载「' + file.name + '」（' + text.length + ' 字）');
+  }).catch(function (err) {
+    hideToast();
+    showToast('❌ ' + err.message, 'err', true);
+    setTimeout(hideToast, 4500);
+  });
+}
+
+/* ==================== 分析并切题 ==================== */
+function analyzeAndSplit() {
+  if (state.readonly) return;
+  var hw = currentHw();
+  if (!hw) { showToast('请先新建作业', 'warn'); return; }
+  var rawText = ($('#sourceInput').value || '').trim();
+  if (!rawText) { showToast('请先粘贴听力原文', 'warn'); return; }
+
+  if (hw.questions && hw.questions.length) {
+    if (!confirm('将重新分析并切分。\n\n已切分内容的原文编辑和挖空会丢失（完整原文会保留在输入框中）。继续？')) return;
+  }
+
+  var cleaned = cleanSourceText(rawText);
+  if (!cleaned.text.trim()) { showToast('清洗后没有剩余内容，请检查原文', 'err'); return; }
+
+  var questions = splitQuestions(cleaned.text);
+  if (!questions.length) { showToast('未识别到题目内容，请检查原文格式', 'warn'); return; }
+
+  hw.sourceText = rawText;
+  hw.questions = questions;
+  hw.currentIndex = 0;
+  hw.updatedAt = Date.now();
+  state.view = 'questions';
+  stopTTS();
+  renderHwSelect();
+  renderAll();
+  save();
+
+  var msg = [];
+  if (cleaned.removed > 0) msg.push('已删除 ' + cleaned.removed + ' 行中文旁白');
+  msg.push('切分为 ' + questions.length + ' 题');
+  showToast('✔ ' + msg.join('，'));
+}
+
+/* ==================== 事件绑定 ==================== */
+function bindEvents() {
+
+  $('#hwSelect').addEventListener('change', function () {
+    switchHomework(this.value);
+  });
+  $('#newHwBtn').addEventListener('click', newHomework);
+  $('#renameHwBtn').addEventListener('click', renameCurrentHw);
+  $('#deleteHwBtn').addEventListener('click', deleteCurrentHw);
+  $('#shareHwBtn').addEventListener('click', shareCurrentHw);
+  $('#exportHwBtn').addEventListener('click', exportCurrentHw);
+  $('#importHwFile').addEventListener('change', function (e) {
+    var f = e.target.files[0];
+    if (!f) return;
+    importHomeworkFile(f);
+    e.target.value = '';
+  });
+
+  /* 分享弹层 */
+  $('#shareClose').addEventListener('click', function () {
+    $('#shareModal').classList.remove('show');
+  });
+  $('#shareCopy').addEventListener('click', function () {
+    var ta = $('#shareUrl');
+    ta.select();
+    ta.setSelectionRange(0, 99999);
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(ta.value).then(function () {
+        showToast('已复制链接');
+      }).catch(function () {
+        showToast(ok ? '已复制链接' : '复制失败，请手动选中复制', ok ? null : 'warn');
+      });
+    } else {
+      showToast(ok ? '已复制链接' : '复制失败，请手动选中复制', ok ? null : 'warn');
+    }
+  });
+  $('#shareModal').addEventListener('click', function (e) {
+    if (e.target === this) this.classList.remove('show');
+  });
+
+  /* 退出浏览 */
+  $('#exitReadonlyBtn').addEventListener('click', exitReadonly);
+
+  $('#backToInput').addEventListener('click', function () {
+    if (state.readonly) return;
+    state.view = 'input';
+    renderAll();
+    save();
+  });
+
+  $('#renameCancel').addEventListener('click', function () {
+    $('#renameModal').classList.remove('show');
+  });
+  $('#renameConfirm').addEventListener('click', function () {
+    var hw = currentHw();
+    if (!hw) return;
+    var name = ($('#renameInput').value || '').trim() || '未命名';
+    hw.name = name;
+    hw.updatedAt = Date.now();
+    $('#renameModal').classList.remove('show');
+    renderHwSelect();
+    renderAll();
+    save();
+    showToast('已重命名为「' + name + '」');
+  });
+  $('#renameInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); $('#renameConfirm').click(); }
+    if (e.key === 'Escape') { $('#renameModal').classList.remove('show'); }
+  });
+  $('#renameModal').addEventListener('click', function (e) {
+    if (e.target === this) this.classList.remove('show');
+  });
+
+  $('#deleteCancel').addEventListener('click', function () {
+    $('#deleteModal').classList.remove('show');
+  });
+  $('#deleteConfirm').addEventListener('click', function () {
+    reallyDeleteHw();
+  });
+  $('#deleteModal').addEventListener('click', function (e) {
+    if (e.target === this) this.classList.remove('show');
+  });
+
+  $('#analyzeBtn').addEventListener('click', analyzeAndSplit);
+
+  $('#clearSourceBtn').addEventListener('click', function () {
+    if (state.readonly) return;
+    var hw = currentHw();
+    if (!hw) return;
+    if (($('#sourceInput').value || '').trim()) {
+      $('#sourceInput').value = '';
+      hw.sourceText = '';
+      save();
+      showToast('已清空');
+    }
+  });
+
+  $('#sourceFile').addEventListener('change', function (e) {
+    if (state.readonly) return;
+    var f = e.target.files[0];
+    if (!f) return;
+    loadSourceFromFile(f);
+    e.target.value = '';
+  });
+
+  var src = $('#sourceInput');
+  ['dragenter','dragover'].forEach(function (ev) {
+    src.addEventListener(ev, function (e) {
+      e.preventDefault(); e.stopPropagation();
+      if (!state.readonly) src.classList.add('dragover');
+    });
+  });
+  ['dragleave','dragend'].forEach(function (ev) {
+    src.addEventListener(ev, function (e) {
+      e.preventDefault(); e.stopPropagation();
+      src.classList.remove('dragover');
+    });
+  });
+  src.addEventListener('drop', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    src.classList.remove('dragover');
+    if (state.readonly) return;
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) loadSourceFromFile(f);
+  });
+  document.addEventListener('dragover', function (e) { e.preventDefault(); });
+  document.addEventListener('drop', function (e) { e.preventDefault(); });
+
+  src.addEventListener('input', function () {
+    if (state.readonly) return;
+    var hw = currentHw();
+    if (!hw) return;
+    hw.sourceText = this.value;
+    hw.updatedAt = Date.now();
+    saveSoon();
+  });
+
+  $$('.tab-btn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var tab = b.getAttribute('data-tab');
+      $$('.tab-btn').forEach(function (x) { x.classList.toggle('active', x === b); });
+      $$('.tab-pane').forEach(function (p) {
+        p.classList.toggle('active', p.getAttribute('data-pane') === tab);
+      });
+    });
+  });
+
+  $('#playBtn').addEventListener('click', playCurrent);
+  $('#stopBtn').addEventListener('click', stopTTS);
+
+  $$('[data-jump]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      jumpBySeconds(parseFloat(b.getAttribute('data-jump')));
+    });
+  });
+
+  $('#femalePitch').addEventListener('input', function (e) {
+    $('#femalePitchVal').textContent = Number(e.target.value).toFixed(2);
+  });
+  $('#femalePitch').addEventListener('change', function () {
+    if (state.readonly) return;
+    state.femalePitch = parseFloat(this.value); save();
+  });
+  $('#malePitch').addEventListener('input', function (e) {
+    $('#malePitchVal').textContent = Number(e.target.value).toFixed(2);
+  });
+  $('#malePitch').addEventListener('change', function () {
+    if (state.readonly) return;
+    state.malePitch = parseFloat(this.value); save();
+  });
+
+  $('#testFemale').addEventListener('click', function () { ttsPreview('female'); });
+  $('#testMale').addEventListener('click', function () { ttsPreview('male'); });
+
+  $('#femaleSel').addEventListener('change', function () {
+    if (state.readonly) return;
+    state.femaleVoice = this.value; save();
+  });
+  $('#maleSel').addEventListener('change', function () {
+    if (state.readonly) return;
+    state.maleVoice = this.value;
+    save();
+  });
+
+  $('#textDisplay').addEventListener('input', function () {
+    if (state.readonly) return;
+    var hw = currentHw();
+    if (!hw) return;
+    var q = hw.questions[hw.currentIndex];
+    if (!q) return;
+    q.text = this.value;
+    hw.updatedAt = Date.now();
+    saveSoon();
+  });
+
+  $('#maskCopyBtn').addEventListener('click', function () {
+    if (state.readonly) return;
+    var hw = currentHw();
+    if (!hw) return;
+    var q = hw.questions[hw.currentIndex];
+    if (!q) return;
+    var s = (q.text || '').trim();
+    if (!s) { showToast('本题原文为空', 'warn'); return; }
+    $('#maskTextArea').value = q.text;
+    q.maskText = q.text;
+    hw.updatedAt = Date.now();
+    save();
+    showToast('已复制原文');
+  });
+
+  $('#maskClearBtn').addEventListener('click', function () {
+    if (state.readonly) return;
+    var hw = currentHw();
+    if (!hw) return;
+    var q = hw.questions[hw.currentIndex];
+    if (!q) return;
+    var ta = $('#maskTextArea');
+    if (!(ta.value || '').trim()) { showToast('已经是空的', 'warn'); return; }
+    ta.value = '';
+    q.maskText = '';
+    hw.updatedAt = Date.now();
+    save();
+    showToast('已清空');
+  });
+
+  $('#maskUnderlineBtn').addEventListener('click', function () {
+    if (state.readonly) return;
+    var hw = currentHw();
+    if (!hw) return;
+    var q = hw.questions[hw.currentIndex];
+    if (!q) return;
+    var ta = $('#maskTextArea');
+    var start = ta.selectionStart, end = ta.selectionEnd;
+    if (start === end) { showToast('请先用鼠标选中要挖空的文字', 'warn'); ta.focus(); return; }
+    var text = ta.value;
+    var sel = text.slice(start, end);
+    var blank = '＿'.repeat(Math.max(2, Math.min(8, sel.length)));
+    ta.value = text.slice(0, start) + blank + text.slice(end);
+    ta.selectionStart = ta.selectionEnd = start + blank.length;
+    q.maskText = ta.value;
+    hw.updatedAt = Date.now();
+    save();
+    showToast('已挖空 ' + sel.length + ' 字');
+    ta.focus();
+  });
+
+  $('#maskTextArea').addEventListener('input', function () {
+    if (state.readonly) return;
+    var hw = currentHw();
+    if (!hw) return;
+    var q = hw.questions[hw.currentIndex];
+    if (!q) return;
+    q.maskText = this.value;
+    hw.updatedAt = Date.now();
+    saveSoon();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    var tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+    if (state.view !== 'questions') return;
+    if (e.code === 'Space') { e.preventDefault(); playCurrent(); }
+    else if (e.code === 'ArrowUp' || e.code === 'ArrowLeft') {
+      e.preventDefault();
+      var hw = currentHw();
+      if (hw) selectQuestion(hw.currentIndex - 1);
+    }
+    else if (e.code === 'ArrowDown' || e.code === 'ArrowRight') {
+      e.preventDefault();
+      var hw2 = currentHw();
+      if (hw2) selectQuestion(hw2.currentIndex + 1);
+    }
+  });
+
+  window.addEventListener('beforeunload', function () {
+    if (ttsSupported()) window.speechSynthesis.cancel();
+  });
+}
+
+/* ==================== 启动 ==================== */
+function init() {
+  /* ★ 优先检查分享链接 */
+  var loadedShared = loadSharedHomeworkFromHash();
+
+  if (!loadedShared) {
+    loadState();
+
+    if (!state.homeworks.length) {
+      var hw = createHomework('作业 1', '');
+      state.homeworks.push(hw);
+      state.currentHwId = hw.id;
+    } else if (!currentHw()) {
+      state.currentHwId = state.homeworks[0].id;
+    }
+
+    /* 兼容旧版 */
+    try {
+      var oldRaw = localStorage.getItem('jp-listening-trainer-v24') ||
+                   localStorage.getItem('jp-listening-trainer-v23') ||
+                   localStorage.getItem('jp-listening-trainer-v22') ||
+                   localStorage.getItem('jp-listening-trainer-v21');
+      if (oldRaw) {
+        var old = JSON.parse(oldRaw);
+        if (old && Array.isArray(old.questions) && old.questions.length && !currentHw().questions.length) {
+          var hw2 = currentHw();
+          hw2.sourceText = old.sourceText || '';
+          hw2.questions = old.questions;
+          hw2.currentIndex = old.currentIndex || 0;
+          if (old.ttsRate) state.ttsRate = old.ttsRate;
+          if (old.femaleVoice) state.femaleVoice = old.femaleVoice;
+          if (old.maleVoice) state.maleVoice = old.maleVoice;
+          if (old.femalePitch) state.femalePitch = old.femalePitch;
+          if (old.malePitch) state.malePitch = old.malePitch;
+        }
+      }
+    } catch (e) {}
+  }
+
+  /* 恢复界面 */
+  if (state.femalePitch) $('#femalePitch').value = state.femalePitch;
+  if (state.malePitch) $('#malePitch').value = state.malePitch;
+  $('#femalePitchVal').textContent = Number($('#femalePitch').value).toFixed(2);
+  $('#malePitchVal').textContent = Number($('#malePitch').value).toFixed(2);
+
+  var hw = currentHw();
+  if (hw) {
+    if (!Array.isArray(hw.questions)) hw.questions = [];
+    if (typeof hw.currentIndex !== 'number') hw.currentIndex = 0;
+    if (hw.currentIndex >= hw.questions.length) hw.currentIndex = 0;
+    if (!state.view) state.view = hw.questions.length ? 'questions' : 'input';
+  }
+
+  renderHwSelect();
+  initVoices();
+  bindEvents();
+  renderAll();
+  updatePlayBtn();
+  if (!state.readonly) save();
+}
+
+init();
+</script>
+</body>
+</html>
